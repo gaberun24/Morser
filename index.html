@@ -163,6 +163,23 @@
   .morse-output { font-size: 1.3rem; letter-spacing: 4px; color: var(--orange); min-height: 40px; padding: 12px; background: var(--bg); border-radius: 7px; word-break: break-all; margin: 12px 0; }
   .char-highlight { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
 
+  /* Toggle switches */
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 0.85rem; color: var(--text2); }
+  .toggle-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .toggle { position: relative; width: 40px; height: 22px; background: var(--bg); border: 1px solid var(--border); border-radius: 11px; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--text2); transition: all 0.2s; }
+  .toggle.on { background: var(--accent2); border-color: var(--accent2); }
+  .toggle.on::after { left: 20px; background: #fff; }
+
+  /* Timer */
+  .timer-display { text-align: center; font-size: 1.5rem; color: var(--orange); font-weight: 700; letter-spacing: 4px; margin: 8px 0; min-height: 36px; }
+  .timer-display.hidden { display: none; }
+
+  /* Single char feedback */
+  .single-char-display { text-align: center; font-size: 3rem; font-weight: 700; color: var(--accent); min-height: 60px; margin: 12px 0; }
+  .single-char-display.correct { color: var(--green); }
+  .single-char-display.wrong { color: var(--red); }
+
   @media (max-width: 480px) {
     .tab { font-size: 0.7rem; padding: 8px 4px; }
     .morse-table { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
@@ -223,6 +240,15 @@
         <button class="gs-btn active" data-gs="5">5</button>
         <button class="gs-btn" data-gs="10">10</button>
       </div>
+
+      <div class="toggle-row">
+        <label><div class="toggle" id="toggleContinuous"></div> Folyamatos mód (limitálatlan idő)</label>
+      </div>
+      <div class="toggle-row">
+        <label><div class="toggle" id="toggleSingleChar"></div> Egykarakteres mód (vár a válaszra)</label>
+      </div>
+
+      <div class="timer-display hidden" id="kochTimer">00:00</div>
 
       <div class="light" id="kochLight"></div>
 
@@ -467,6 +493,14 @@ let kochGroupSize = 5;
 let kochCurrentSequence = '';
 let kochPlayed = false;
 
+// Continuous & single-char mode
+let continuousMode = false;
+let singleCharMode = false;
+let continuousActive = false;
+let timerInterval = null;
+let timerStart = 0;
+let continuousStats = { correct: 0, wrong: 0 };
+
 const kochBar = document.getElementById('kochBar');
 const kochBarLabel = document.getElementById('kochBarLabel');
 const kochCharsEl = document.getElementById('kochChars');
@@ -600,8 +634,12 @@ function generateKochSequence() {
   return seq;
 }
 
-kochPlay.addEventListener('click', async () => {
-  kochCurrentSequence = generateKochSequence();
+async function playKochRound() {
+  if (singleCharMode) {
+    kochCurrentSequence = generateKochSequence().charAt(0); // single char
+  } else {
+    kochCurrentSequence = generateKochSequence();
+  }
   kochPlayed = true;
   kochNewCharEl.style.display = 'none';
   kochAnswer.innerHTML = '';
@@ -617,18 +655,46 @@ kochPlay.addEventListener('click', async () => {
     lightEl: kochLight
   });
 
-  kochStop.style.display = 'none';
-  kochPlay.style.display = '';
-  kochReplay.style.display = '';
+  if (continuousActive) {
+    kochStop.style.display = '';
+    kochPlay.style.display = 'none';
+  } else {
+    kochStop.style.display = 'none';
+    kochPlay.style.display = '';
+  }
+  kochReplay.style.display = continuousActive ? 'none' : '';
   kochInputEl.focus();
+
+  // In single char mode, auto-check on single keypress
+  if (singleCharMode) {
+    kochInputEl.maxLength = 1;
+  } else {
+    kochInputEl.removeAttribute('maxLength');
+  }
+}
+
+kochPlay.addEventListener('click', async () => {
+  if (continuousMode) {
+    continuousActive = true;
+    startTimer();
+    kochPlay.style.display = 'none';
+    kochStop.style.display = '';
+    await playKochRound();
+  } else {
+    await playKochRound();
+  }
 });
 
 kochStop.addEventListener('click', () => {
-  stopPlayback();
-  kochStop.style.display = 'none';
-  kochPlay.style.display = '';
-  kochReplay.style.display = '';
-  kochLight.classList.remove('on');
+  if (continuousActive) {
+    stopContinuous();
+  } else {
+    stopPlayback();
+    kochStop.style.display = 'none';
+    kochPlay.style.display = '';
+    kochReplay.style.display = '';
+    kochLight.classList.remove('on');
+  }
 });
 
 kochReplay.addEventListener('click', async () => {
@@ -646,6 +712,13 @@ kochReplay.addEventListener('click', async () => {
 
 kochInputEl.addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); kochCheck.click(); }
+});
+
+// Single char mode: auto-check when a character is typed
+kochInputEl.addEventListener('input', () => {
+  if (singleCharMode && kochPlayed && kochInputEl.value.length >= 1) {
+    kochCheck.click();
+  }
 });
 
 kochCheck.addEventListener('click', () => {
@@ -696,6 +769,15 @@ kochCheck.addEventListener('click', () => {
 
   // Check if we should unlock a new character
   checkKochAdvance();
+
+  // Auto-advance in continuous mode
+  if (continuousActive) {
+    const delay = singleCharMode ? 600 : 1500;
+    setTimeout(async () => {
+      if (!continuousActive) return;
+      await playKochRound();
+    }, delay);
+  }
 });
 
 function checkKochAdvance() {
@@ -751,6 +833,48 @@ renderKochProgress();
 renderKochStats();
 
 document.getElementById('kochShowRef').addEventListener('change', () => renderKochRef());
+
+// Toggle handlers
+const toggleContinuous = document.getElementById('toggleContinuous');
+const toggleSingleChar = document.getElementById('toggleSingleChar');
+const kochTimerEl = document.getElementById('kochTimer');
+
+toggleContinuous.addEventListener('click', () => {
+  continuousMode = !continuousMode;
+  toggleContinuous.classList.toggle('on', continuousMode);
+  if (!continuousMode) stopContinuous();
+});
+
+toggleSingleChar.addEventListener('click', () => {
+  singleCharMode = !singleCharMode;
+  toggleSingleChar.classList.toggle('on', singleCharMode);
+});
+
+function startTimer() {
+  timerStart = Date.now();
+  kochTimerEl.classList.remove('hidden');
+  updateTimer();
+  timerInterval = setInterval(updateTimer, 1000);
+}
+
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  kochTimerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function stopContinuous() {
+  continuousActive = false;
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  kochTimerEl.classList.add('hidden');
+  stopPlayback();
+  kochLight.classList.remove('on');
+  kochStop.style.display = 'none';
+  kochPlay.style.display = '';
+  kochPlay.textContent = '▶ Lejátszás';
+  kochInputEl.disabled = false;
+}
 
 // ========== KÜLDÉS (PADDLE) MÓD ==========
 let practiceLevel = 'beginner';
