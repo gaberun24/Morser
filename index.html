@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morse-kód Tanuló</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e17;
+    --surface: #131a2b;
+    --surface2: #1a2340;
+    --border: #253354;
+    --text: #e0e6f0;
+    --text2: #8892a8;
+    --accent: #4fc3f7;
+    --accent2: #0288d1;
+    --green: #66bb6a;
+    --red: #ef5350;
+    --orange: #ffa726;
+    --radius: 10px;
+  }
+
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  .app { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+  header { text-align: center; padding: 24px 0 16px; }
+  header h1 { font-size: 1.5rem; color: var(--accent); letter-spacing: 4px; text-transform: uppercase; }
+  header h1 span { color: var(--text2); font-size: 0.75rem; display: block; letter-spacing: 8px; margin-top: 4px; }
+
+  .tabs { display: flex; gap: 4px; background: var(--surface); border-radius: var(--radius); padding: 4px; margin-bottom: 20px; }
+  .tab { flex: 1; padding: 10px 8px; border: none; background: none; color: var(--text2); font-family: inherit; font-size: 0.8rem; cursor: pointer; border-radius: 7px; transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--accent2); color: #fff; font-weight: 600; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 0.9rem; color: var(--accent); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 2px; }
+
+  textarea, input[type="text"] { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 1rem; padding: 12px; border-radius: 7px; outline: none; resize: vertical; }
+  textarea:focus, input[type="text"]:focus { border-color: var(--accent); }
+  textarea { min-height: 80px; }
+
+  button { font-family: inherit; cursor: pointer; }
+  .btn { background: var(--accent2); color: #fff; border: none; padding: 10px 20px; border-radius: 7px; font-size: 0.85rem; font-weight: 600; transition: background 0.2s; }
+  .btn:hover { background: var(--accent); color: var(--bg); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-sm { padding: 6px 14px; font-size: 0.75rem; }
+  .btn-danger { background: var(--red); }
+  .btn-danger:hover { background: #c62828; color: #fff; }
+
+  .speed-control { display: flex; align-items: center; gap: 12px; margin: 8px 0; font-size: 0.85rem; color: var(--text2); }
+  .speed-control input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .speed-val { color: var(--accent); font-weight: 600; min-width: 60px; }
+
+  .light { width: 40px; height: 40px; border-radius: 50%; background: #1a1a2e; border: 2px solid var(--border); margin: 12px auto; transition: background 0.05s; }
+  .light.on { background: var(--accent); box-shadow: 0 0 20px var(--accent), 0 0 40px rgba(79, 195, 247, 0.3); }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .toolbar .spacer { flex: 1; }
+
+  .feedback { text-align: center; font-size: 1.1rem; padding: 8px; min-height: 36px; font-weight: 600; }
+  .feedback.correct { color: var(--green); }
+  .feedback.wrong { color: var(--red); }
+
+  .score { display: flex; justify-content: center; gap: 24px; font-size: 0.85rem; color: var(--text2); margin: 12px 0; }
+  .score b { color: var(--text); font-weight: 600; }
+
+  /* Koch progress */
+  .koch-progress { margin-bottom: 16px; }
+  .koch-bar-wrap { background: var(--bg); border-radius: 20px; height: 12px; overflow: hidden; margin: 8px 0; }
+  .koch-bar { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 20px; transition: width 0.5s ease; }
+  .koch-bar-label { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text2); }
+  .koch-chars { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .koch-char-badge { padding: 4px 10px; border-radius: 5px; font-size: 0.8rem; font-weight: 600; background: var(--surface2); color: var(--text2); border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; }
+  .koch-char-badge.unlocked { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+  .koch-char-badge.unlocked.disabled { background: var(--surface2); color: var(--text2); border-color: var(--border); opacity: 0.5; }
+  .koch-char-badge.current { background: var(--orange); color: var(--bg); border-color: var(--orange); animation: pulse 1.5s infinite; }
+  .koch-char-badge.unlocked:hover { transform: scale(1.1); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+  /* Koch answer display */
+  .koch-answer-display { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; min-height: 48px; margin: 12px 0; font-size: 1.5rem; letter-spacing: 2px; }
+  .koch-answer-display .ch { padding: 2px 6px; border-radius: 4px; }
+  .koch-answer-display .ch.ok { color: var(--green); background: rgba(102,187,106,0.1); }
+  .koch-answer-display .ch.err { color: var(--red); background: rgba(239,83,80,0.1); text-decoration: line-through; }
+  .koch-answer-display .ch.expected { color: var(--orange); font-size: 0.8em; }
+
+  /* Koch stats grid */
+  .koch-stats { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+  .koch-stat { background: var(--bg); border-radius: 5px; padding: 4px 8px; font-size: 0.7rem; text-align: center; min-width: 44px; }
+  .koch-stat .st-char { font-weight: 700; color: var(--accent); }
+  .koch-stat .st-pct { color: var(--text2); }
+  .koch-stat.weak .st-pct { color: var(--red); }
+  .koch-stat.strong .st-pct { color: var(--green); }
+
+  .koch-group-size { display: flex; gap: 6px; align-items: center; font-size: 0.85rem; color: var(--text2); margin: 8px 0; }
+  .koch-group-size .gs-btn { padding: 4px 12px; border: 1px solid var(--border); background: none; color: var(--text2); border-radius: 5px; font-family: inherit; font-size: 0.8rem; }
+  .koch-group-size .gs-btn.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+  .koch-new-char { text-align: center; padding: 16px; background: rgba(255,167,38,0.1); border: 1px solid var(--orange); border-radius: var(--radius); margin-bottom: 16px; }
+  .koch-new-char .big { font-size: 2.5rem; color: var(--orange); font-weight: 700; }
+  .koch-new-char .code { font-size: 1.2rem; color: var(--text2); letter-spacing: 4px; margin-top: 4px; }
+
+  /* Koch reference grid */
+  .koch-ref-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; }
+  .koch-ref-cell { background: var(--bg); border-radius: 6px; padding: 8px 6px; text-align: center; cursor: pointer; transition: background 0.15s; }
+  .koch-ref-cell:hover { background: var(--surface2); }
+  .koch-ref-cell .ref-char { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+  .koch-ref-cell .ref-code { font-size: 0.9rem; color: var(--orange); letter-spacing: 3px; margin-top: 2px; }
+
+  /* Practice paddle */
+  .practice-cards { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; }
+  .practice-card { background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius); padding: 16px 20px; text-align: center; flex: 1; max-width: 160px; transition: all 0.2s; }
+  .practice-card.current { border-color: var(--accent); box-shadow: 0 0 15px rgba(79, 195, 247, 0.15); }
+  .practice-card.done { border-color: var(--green); opacity: 0.6; }
+  .practice-card.wrong-card { border-color: var(--red); }
+  .practice-card .pc-char { font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .practice-card.done .pc-char { color: var(--green); }
+  .practice-card.wrong-card .pc-char { color: var(--red); }
+  .practice-card .pc-code { font-size: 1.1rem; color: var(--orange); letter-spacing: 4px; margin-top: 4px; }
+  .practice-card .pc-input { font-size: 1.1rem; color: var(--text); letter-spacing: 4px; margin-top: 8px; min-height: 24px; border-top: 1px solid var(--border); padding-top: 8px; }
+
+  .difficulty { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+  .diff-btn { padding: 6px 16px; border: 1px solid var(--border); background: none; color: var(--text2); border-radius: 7px; font-family: inherit; font-size: 0.75rem; transition: all 0.2s; }
+  .diff-btn:hover { border-color: var(--accent); color: var(--text); }
+  .diff-btn.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+
+  .paddle-hint { text-align: center; color: var(--text2); font-size: 0.8rem; margin-bottom: 8px; }
+  .paddle-row { display: flex; gap: 16px; justify-content: center; margin: 16px 0; }
+  .paddle-btn { flex: 1; max-width: 200px; padding: 20px 16px; border: 2px solid var(--border); background: var(--bg); color: var(--text); border-radius: var(--radius); font-family: inherit; font-size: 1rem; font-weight: 600; transition: all 0.1s; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .paddle-btn:active, .paddle-btn.pressing { transform: scale(0.96); }
+  .paddle-btn.dit { border-color: var(--accent2); }
+  .paddle-btn.dit:active, .paddle-btn.dit.pressing { background: var(--accent2); color: #fff; }
+  .paddle-btn.dah { border-color: var(--orange); }
+  .paddle-btn.dah:active, .paddle-btn.dah.pressing { background: #e65100; border-color: #e65100; color: #fff; }
+  .paddle-btn .paddle-key { font-size: 0.7rem; color: var(--text2); display: block; margin-top: 4px; }
+
+  /* Keyer */
+  .keyer-area { text-align: center; padding: 30px 20px; background: var(--bg); border-radius: 7px; border: 2px dashed var(--border); cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .keyer-area:active, .keyer-area.pressing { border-color: var(--accent); background: var(--surface2); }
+  .keyer-area p { color: var(--text2); font-size: 0.8rem; margin-top: 8px; }
+  .keyer-signals { font-size: 2rem; letter-spacing: 6px; color: var(--orange); min-height: 44px; margin: 12px 0; }
+  .keyer-decoded { font-size: 1.5rem; color: var(--accent); min-height: 40px; margin: 8px 0; word-break: break-all; }
+
+  /* Table */
+  .morse-table { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
+  .morse-cell { background: var(--bg); border-radius: 6px; padding: 8px; text-align: center; cursor: pointer; transition: background 0.15s; }
+  .morse-cell:hover { background: var(--surface2); }
+  .morse-cell .char { font-size: 1.1rem; color: var(--accent); font-weight: 700; }
+  .morse-cell .code { font-size: 0.85rem; color: var(--orange); letter-spacing: 3px; margin-top: 2px; }
+
+  .morse-output { font-size: 1.3rem; letter-spacing: 4px; color: var(--orange); min-height: 40px; padding: 12px; background: var(--bg); border-radius: 7px; word-break: break-all; margin: 12px 0; }
+  .char-highlight { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
+
+  @media (max-width: 480px) {
+    .tab { font-size: 0.7rem; padding: 8px 4px; }
+    .morse-table { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+    header h1 { font-size: 1.2rem; }
+    .practice-card { padding: 12px 10px; }
+    .practice-card .pc-char { font-size: 1.5rem; }
+    .paddle-btn { padding: 16px 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Morse Tanuló<span>·· &ndash;&ndash; ·&ndash; ·&ndash;· ··· ·</span></h1>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="koch">Koch</button>
+    <button class="tab" data-tab="send">Küldés</button>
+    <button class="tab" data-tab="keyer">Morzoló</button>
+    <button class="tab" data-tab="table">Táblázat</button>
+  </div>
+
+  <!-- KOCH MÓD -->
+  <div id="koch" class="panel active">
+    <div class="card">
+      <h2>Koch-módszer + Farnsworth</h2>
+
+      <div class="koch-progress">
+        <div class="koch-bar-wrap"><div class="koch-bar" id="kochBar"></div></div>
+        <div class="koch-bar-label">
+          <span id="kochBarLabel">2 / 40 karakter</span>
+          <span>90%+ → új karakter</span>
+        </div>
+        <div class="koch-chars" id="kochChars"></div>
+      </div>
+
+      <div id="kochNewChar" class="koch-new-char" style="display:none">
+        <div>Új karakter feloldva!</div>
+        <div class="big" id="kochNewCharBig"></div>
+        <div class="code" id="kochNewCharCode"></div>
+      </div>
+
+      <div class="speed-control">
+        <label>Karakter:</label>
+        <input type="range" id="kochCharSpeed" min="10" max="30" value="20">
+        <span class="speed-val" id="kochCharSpeedVal">20 WPM</span>
+      </div>
+      <div class="speed-control">
+        <label>Effektív:</label>
+        <input type="range" id="kochEffSpeed" min="5" max="25" value="10">
+        <span class="speed-val" id="kochEffSpeedVal">10 WPM</span>
+      </div>
+
+      <div class="koch-group-size">
+        Csoportméret:
+        <button class="gs-btn" data-gs="3">3</button>
+        <button class="gs-btn active" data-gs="5">5</button>
+        <button class="gs-btn" data-gs="10">10</button>
+      </div>
+
+      <div class="light" id="kochLight"></div>
+
+      <div class="toolbar" style="margin-bottom:12px">
+        <button class="btn" id="kochPlay">▶ Lejátszás</button>
+        <button class="btn btn-danger btn-sm" id="kochStop" style="display:none">■ Stop</button>
+        <button class="btn btn-sm" id="kochReplay" style="display:none">↻ Ismét</button>
+      </div>
+
+      <input type="text" id="kochInput" placeholder="Írd be amit hallottál…" autocomplete="off" autocapitalize="characters" spellcheck="false" style="text-transform:uppercase;font-size:1.3rem;letter-spacing:4px;text-align:center">
+
+      <div style="display:flex;align-items:center;gap:8px;margin:12px 0 4px">
+        <label style="font-size:0.75rem;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:6px">
+          <input type="checkbox" id="kochShowRef" checked style="accent-color:var(--accent)"> Puska mutatása
+        </label>
+      </div>
+      <div class="koch-ref-grid" id="kochRefGrid" style="margin:0 0 12px"></div>
+
+      <div class="koch-answer-display" id="kochAnswer"></div>
+
+      <div class="toolbar" style="margin-top:8px">
+        <button class="btn" id="kochCheck" disabled>Ellenőrzés</button>
+        <div class="spacer"></div>
+        <button class="btn btn-sm" id="kochReset">Újrakezdés</button>
+      </div>
+
+      <div class="score" style="margin-top:12px">
+        Helyes: <b id="kochCorrect">0</b> &nbsp;|&nbsp;
+        Hibás: <b id="kochWrong">0</b> &nbsp;|&nbsp;
+        Pontosság: <b id="kochAccuracy">-</b>
+      </div>
+
+      <div class="koch-stats" id="kochStats"></div>
+    </div>
+  </div>
+
+  <!-- KÜLDÉS (PADDLE) -->
+  <div id="send" class="panel">
+    <div class="card">
+      <h2>Csipogd le!</h2>
+      <div class="difficulty">
+        <button class="diff-btn active" data-level="beginner">Kezdő</button>
+        <button class="diff-btn" data-level="advanced">Haladó</button>
+        <button class="diff-btn" data-level="pro">Profi</button>
+      </div>
+      <div class="practice-cards" id="practiceCards"></div>
+      <div class="light" id="practiceLight"></div>
+      <div class="paddle-hint">← bal nyíl = ti (pont) &nbsp;&nbsp; jobb nyíl → = tá (vonás)</div>
+      <div class="paddle-row">
+        <button class="paddle-btn dit" id="paddleDit">● ti<span class="paddle-key">← bal nyíl</span></button>
+        <button class="paddle-btn dah" id="paddleDah">▬ tá<span class="paddle-key">jobb nyíl →</span></button>
+      </div>
+      <div class="feedback" id="practiceFeedback"></div>
+      <div class="score">
+        Helyes: <b id="scoreCorrect">0</b> &nbsp;|&nbsp;
+        Hibás: <b id="scoreWrong">0</b> &nbsp;|&nbsp;
+        Sorozat: <b id="scoreStreak">0</b>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="practiceStart">▶ Indítás</button>
+        <div class="spacer"></div>
+        <button class="btn btn-sm" id="practiceSkip">Ugrás →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MORZOLÓ -->
+  <div id="keyer" class="panel">
+    <div class="card">
+      <h2>Szabadgyakorlás</h2>
+      <div class="keyer-area" id="keyerArea">
+        <div class="light" id="keyerLight" style="margin:0 auto 12px"></div>
+        Nyomd meg a <b>szóközt</b> vagy <b>koppints</b>!
+        <p>Rövid = pont (●) &nbsp; Hosszú = vonás (▬)</p>
+      </div>
+      <div class="keyer-signals" id="keyerSignals"></div>
+      <div class="keyer-decoded" id="keyerDecoded"></div>
+      <div class="toolbar">
+        <button class="btn btn-sm btn-danger" id="keyerClear">Törlés</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Szöveg → Morse</h2>
+      <textarea id="learnInput" placeholder="Írj be szöveget…" spellcheck="false">SOS</textarea>
+      <div class="morse-output" id="learnOutput"></div>
+      <div class="light" id="learnLight"></div>
+      <div class="speed-control">
+        <label>Sebesség:</label>
+        <input type="range" id="learnSpeed" min="5" max="30" value="15">
+        <span class="speed-val" id="learnSpeedVal">15 WPM</span>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="learnPlay">▶ Lejátszás</button>
+        <button class="btn btn-danger btn-sm" id="learnStop" style="display:none">■ Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TÁBLÁZAT -->
+  <div id="table" class="panel">
+    <div class="card">
+      <h2>Morse kód táblázat</h2>
+      <p style="color:var(--text2);font-size:0.8rem;margin-bottom:12px">Kattints egy cellára a hang lejátszásához!</p>
+      <div class="morse-table" id="morseTable"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== MORSE CODE MAP ==========
+const MORSE = {
+  'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....',
+  'I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.',
+  'Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-','V':'...-','W':'.--','X':'-..-',
+  'Y':'-.--','Z':'--..',
+  '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....',
+  '6':'-....','7':'--...','8':'---..','9':'----.',
+  '.':'.-.-.-',',':'--..--','?':'..--..','!':'-.-.--','/':'-..-.'
+};
+
+const REVERSE_MORSE = {};
+for (const [k, v] of Object.entries(MORSE)) REVERSE_MORSE[v] = k;
+
+// Koch order — maximally dissimilar consecutive characters
+const KOCH_ORDER = [
+  'K','M','R','S','U','A','P','T','L','O',
+  'W','I','N','J','E','F','0','Y','V','G',
+  '5','Q','9','Z','H','3','8','B','4','2',
+  '7','C','1','D','6','X','.',',','?','!'
+];
+
+const SEND_LEVELS = {
+  beginner: ['E','T','A','I','N','M','S','O'],
+  advanced: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+  pro: Object.keys(MORSE)
+};
+
+// ========== AUDIO ENGINE ==========
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, durationMs) {
+  return new Promise(resolve => {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.005);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime + durationMs / 1000 - 0.005);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + durationMs / 1000);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + durationMs / 1000);
+    setTimeout(resolve, durationMs);
+  });
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+let currentAbort = null;
+function stopPlayback() { if (currentAbort) currentAbort.stopped = true; }
+
+// Farnsworth-aware playMorse
+// charWpm = speed of individual characters, effWpm = overall speed (gaps stretched)
+async function playMorse(text, charWpm, effWpm, { onChar, lightEl } = {}) {
+  if (!effWpm) effWpm = charWpm;
+  const charUnit = 1200 / charWpm;
+  const freq = 700;
+  const abort = { stopped: false };
+  currentAbort = abort;
+
+  // Farnsworth gap calculation
+  let gapUnit = charUnit;
+  if (effWpm < charWpm) {
+    const totalTime = 60000 / effWpm;       // ms for one PARIS word
+    const charTime = 31 * charUnit;          // ms for character elements of PARIS
+    gapUnit = (totalTime - charTime) / 19;   // stretched gap unit
+  }
+
+  const upper = text.toUpperCase();
+  for (let ci = 0; ci < upper.length; ci++) {
+    if (abort.stopped) return;
+    const ch = upper[ci];
+    if (onChar) onChar(ci, ch);
+
+    if (ch === ' ') { await sleep(gapUnit * 7); continue; }
+
+    const code = MORSE[ch];
+    if (!code) continue;
+
+    for (let si = 0; si < code.length; si++) {
+      if (abort.stopped) return;
+      if (lightEl) lightEl.classList.add('on');
+      const dur = code[si] === '.' ? charUnit : charUnit * 3;
+      await playTone(freq, dur);
+      if (lightEl) lightEl.classList.remove('on');
+      if (si < code.length - 1) await sleep(charUnit); // intra-char = always char speed
+    }
+
+    if (ci < upper.length - 1 && upper[ci + 1] !== ' ') {
+      await sleep(gapUnit * 3); // inter-char gap (Farnsworth stretched)
+    }
+  }
+  if (lightEl) lightEl.classList.remove('on');
+}
+
+// ========== TAB SWITCHING ==========
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    stopPlayback();
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ========== KOCH MÓD ==========
+const KOCH_STORAGE_KEY = 'morseKoch';
+
+function loadKoch() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KOCH_STORAGE_KEY));
+    if (d && d.level >= 2) return d;
+  } catch(e) {}
+  return { level: 2, stats: {}, totalCorrect: 0, totalWrong: 0 };
+}
+
+function saveKoch(data) {
+  localStorage.setItem(KOCH_STORAGE_KEY, JSON.stringify(data));
+}
+
+let koch = loadKoch();
+let kochGroupSize = 5;
+let kochCurrentSequence = '';
+let kochPlayed = false;
+
+const kochBar = document.getElementById('kochBar');
+const kochBarLabel = document.getElementById('kochBarLabel');
+const kochCharsEl = document.getElementById('kochChars');
+const kochCharSpeed = document.getElementById('kochCharSpeed');
+const kochCharSpeedVal = document.getElementById('kochCharSpeedVal');
+const kochEffSpeed = document.getElementById('kochEffSpeed');
+const kochEffSpeedVal = document.getElementById('kochEffSpeedVal');
+const kochLight = document.getElementById('kochLight');
+const kochPlay = document.getElementById('kochPlay');
+const kochStop = document.getElementById('kochStop');
+const kochReplay = document.getElementById('kochReplay');
+const kochInputEl = document.getElementById('kochInput');
+const kochAnswer = document.getElementById('kochAnswer');
+const kochCheck = document.getElementById('kochCheck');
+const kochReset = document.getElementById('kochReset');
+const kochNewCharEl = document.getElementById('kochNewChar');
+const kochStatsEl = document.getElementById('kochStats');
+
+kochCharSpeed.addEventListener('input', () => {
+  kochCharSpeedVal.textContent = kochCharSpeed.value + ' WPM';
+  // Ensure effective ≤ character speed
+  if (parseInt(kochEffSpeed.value) > parseInt(kochCharSpeed.value)) {
+    kochEffSpeed.value = kochCharSpeed.value;
+    kochEffSpeedVal.textContent = kochEffSpeed.value + ' WPM';
+  }
+  kochEffSpeed.max = kochCharSpeed.value;
+});
+
+kochEffSpeed.addEventListener('input', () => {
+  kochEffSpeedVal.textContent = kochEffSpeed.value + ' WPM';
+});
+
+document.querySelectorAll('.gs-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.gs-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    kochGroupSize = parseInt(btn.dataset.gs);
+  });
+});
+
+let kochDisabled = new Set(); // manually disabled characters
+
+function getUnlockedChars() {
+  return KOCH_ORDER.slice(0, koch.level);
+}
+
+function getActiveChars() {
+  return getUnlockedChars().filter(ch => !kochDisabled.has(ch));
+}
+
+function renderKochProgress() {
+  const pct = (koch.level / KOCH_ORDER.length) * 100;
+  kochBar.style.width = pct + '%';
+  const active = getActiveChars();
+  kochBarLabel.textContent = koch.level + ' / ' + KOCH_ORDER.length + ' karakter (aktív: ' + active.length + ')';
+
+  kochCharsEl.innerHTML = '';
+  KOCH_ORDER.forEach((ch, i) => {
+    const badge = document.createElement('span');
+    badge.className = 'koch-char-badge';
+    badge.textContent = ch;
+    if (i < koch.level) {
+      badge.classList.add('unlocked');
+      if (kochDisabled.has(ch)) badge.classList.add('disabled');
+      if (i === koch.level - 1 && koch.level > 2 && !kochDisabled.has(ch)) badge.classList.add('current');
+      badge.addEventListener('click', () => {
+        // Toggle on/off
+        if (kochDisabled.has(ch)) {
+          kochDisabled.delete(ch);
+        } else {
+          // Must keep at least 2 active
+          if (getActiveChars().length <= 2) return;
+          kochDisabled.add(ch);
+        }
+        renderKochProgress();
+        renderKochRef();
+      });
+    }
+    kochCharsEl.appendChild(badge);
+  });
+}
+
+function renderKochStats() {
+  kochStatsEl.innerHTML = '';
+  const unlocked = getUnlockedChars();
+  unlocked.forEach(ch => {
+    const s = koch.stats[ch] || { hit: 0, miss: 0 };
+    const total = s.hit + s.miss;
+    const pct = total > 0 ? Math.round(s.hit / total * 100) : 0;
+    const div = document.createElement('div');
+    div.className = 'koch-stat';
+    if (total >= 5) {
+      if (pct < 70) div.classList.add('weak');
+      else if (pct >= 90) div.classList.add('strong');
+    }
+    div.innerHTML = `<div class="st-char">${ch}</div><div class="st-pct">${total > 0 ? pct + '%' : '-'}</div>`;
+    kochStatsEl.appendChild(div);
+  });
+
+  document.getElementById('kochCorrect').textContent = koch.totalCorrect;
+  document.getElementById('kochWrong').textContent = koch.totalWrong;
+  const total = koch.totalCorrect + koch.totalWrong;
+  document.getElementById('kochAccuracy').textContent = total > 0 ? Math.round(koch.totalCorrect / total * 100) + '%' : '-';
+
+  // Render reference grid
+  renderKochRef();
+}
+
+function renderKochRef() {
+  const refGrid = document.getElementById('kochRefGrid');
+  const show = document.getElementById('kochShowRef').checked;
+  refGrid.style.display = show ? '' : 'none';
+  if (!show) return;
+  const active = getActiveChars();
+  refGrid.innerHTML = '';
+  active.forEach(ch => {
+    const cell = document.createElement('div');
+    cell.className = 'koch-ref-cell';
+    cell.innerHTML = `<div class="ref-char">${ch}</div><div class="ref-code">${MORSE[ch].replace(/\./g, '●').replace(/-/g, '▬')}</div>`;
+    cell.addEventListener('click', () => playMorse(ch, parseInt(kochCharSpeed.value)));
+    refGrid.appendChild(cell);
+  });
+}
+
+function generateKochSequence() {
+  const pool = getActiveChars();
+  let seq = '';
+  for (let i = 0; i < kochGroupSize; i++) {
+    seq += pool[Math.floor(Math.random() * pool.length)];
+  }
+  return seq;
+}
+
+kochPlay.addEventListener('click', async () => {
+  kochCurrentSequence = generateKochSequence();
+  kochPlayed = true;
+  kochNewCharEl.style.display = 'none';
+  kochAnswer.innerHTML = '';
+  kochInputEl.value = '';
+  kochInputEl.disabled = false;
+  kochCheck.disabled = false;
+
+  kochPlay.style.display = 'none';
+  kochStop.style.display = '';
+  kochReplay.style.display = 'none';
+
+  await playMorse(kochCurrentSequence, parseInt(kochCharSpeed.value), parseInt(kochEffSpeed.value), {
+    lightEl: kochLight
+  });
+
+  kochStop.style.display = 'none';
+  kochPlay.style.display = '';
+  kochReplay.style.display = '';
+  kochInputEl.focus();
+});
+
+kochStop.addEventListener('click', () => {
+  stopPlayback();
+  kochStop.style.display = 'none';
+  kochPlay.style.display = '';
+  kochReplay.style.display = '';
+  kochLight.classList.remove('on');
+});
+
+kochReplay.addEventListener('click', async () => {
+  if (!kochCurrentSequence) return;
+  kochReplay.disabled = true;
+  kochPlay.style.display = 'none';
+  kochStop.style.display = '';
+  await playMorse(kochCurrentSequence, parseInt(kochCharSpeed.value), parseInt(kochEffSpeed.value), {
+    lightEl: kochLight
+  });
+  kochStop.style.display = 'none';
+  kochPlay.style.display = '';
+  kochReplay.disabled = false;
+});
+
+kochInputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); kochCheck.click(); }
+});
+
+kochCheck.addEventListener('click', () => {
+  if (!kochPlayed || !kochCurrentSequence) return;
+  const answer = kochInputEl.value.toUpperCase().trim();
+  const target = kochCurrentSequence;
+
+  // Show comparison
+  kochAnswer.innerHTML = '';
+  const maxLen = Math.max(answer.length, target.length);
+  for (let i = 0; i < maxLen; i++) {
+    const a = answer[i] || '';
+    const t = target[i] || '';
+    const span = document.createElement('span');
+    span.className = 'ch';
+
+    if (a === t) {
+      span.classList.add('ok');
+      span.textContent = a;
+      if (!koch.stats[t]) koch.stats[t] = { hit: 0, miss: 0 };
+      koch.stats[t].hit++;
+      koch.totalCorrect++;
+    } else {
+      // Show wrong answer
+      if (a) {
+        const errSpan = document.createElement('span');
+        errSpan.className = 'ch err';
+        errSpan.textContent = a;
+        kochAnswer.appendChild(errSpan);
+      }
+      // Show expected
+      if (t) {
+        span.classList.add('expected');
+        span.textContent = t;
+        if (!koch.stats[t]) koch.stats[t] = { hit: 0, miss: 0 };
+        koch.stats[t].miss++;
+        koch.totalWrong++;
+      }
+    }
+    kochAnswer.appendChild(span);
+  }
+
+  kochInputEl.disabled = true;
+  kochCheck.disabled = true;
+  kochPlayed = false;
+  saveKoch(koch);
+  renderKochStats();
+
+  // Check if we should unlock a new character
+  checkKochAdvance();
+});
+
+function checkKochAdvance() {
+  if (koch.level >= KOCH_ORDER.length) return;
+
+  const unlocked = getUnlockedChars();
+  let totalHit = 0, totalMiss = 0;
+  let allHaveData = true;
+
+  unlocked.forEach(ch => {
+    const s = koch.stats[ch];
+    if (!s || (s.hit + s.miss) < 5) { allHaveData = false; return; }
+    totalHit += s.hit;
+    totalMiss += s.miss;
+  });
+
+  if (!allHaveData) return;
+
+  const accuracy = totalHit / (totalHit + totalMiss);
+  if (accuracy >= 0.90) {
+    // Unlock next character!
+    koch.level++;
+    saveKoch(koch);
+    renderKochProgress();
+
+    const newCh = KOCH_ORDER[koch.level - 1];
+    kochNewCharEl.style.display = '';
+    document.getElementById('kochNewCharBig').textContent = newCh;
+    document.getElementById('kochNewCharCode').textContent = MORSE[newCh].replace(/\./g, '●').replace(/-/g, '▬');
+
+    // Play the new character's sound
+    setTimeout(() => {
+      playMorse(newCh, parseInt(kochCharSpeed.value));
+    }, 500);
+  }
+}
+
+kochReset.addEventListener('click', () => {
+  if (!confirm('Biztosan újrakezded? Minden haladás törlődik!')) return;
+  koch = { level: 2, stats: {}, totalCorrect: 0, totalWrong: 0 };
+  saveKoch(koch);
+  kochNewCharEl.style.display = 'none';
+  kochAnswer.innerHTML = '';
+  kochInputEl.value = '';
+  kochInputEl.disabled = false;
+  kochCurrentSequence = '';
+  kochPlayed = false;
+  renderKochProgress();
+  renderKochStats();
+});
+
+renderKochProgress();
+renderKochStats();
+
+document.getElementById('kochShowRef').addEventListener('change', () => renderKochRef());
+
+// ========== KÜLDÉS (PADDLE) MÓD ==========
+let practiceLevel = 'beginner';
+let practiceChars = [];
+let practiceIdx = 0;
+let practiceInput = '';
+let practiceActive = false;
+let scoreCorrect = 0;
+let scoreWrong = 0;
+let scoreStreak = 0;
+
+const practiceCardsEl = document.getElementById('practiceCards');
+const practiceLight = document.getElementById('practiceLight');
+const practiceFeedback = document.getElementById('practiceFeedback');
+const practiceStartBtn = document.getElementById('practiceStart');
+const practiceSkip = document.getElementById('practiceSkip');
+const paddleDit = document.getElementById('paddleDit');
+const paddleDah = document.getElementById('paddleDah');
+
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    practiceLevel = btn.dataset.level;
+  });
+});
+
+function pickRandom(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
+
+function pickThree() {
+  const pool = SEND_LEVELS[practiceLevel];
+  const chars = [];
+  for (let i = 0; i < 3; i++) {
+    let ch;
+    do { ch = pickRandom(pool); } while (chars.includes(ch));
+    chars.push(ch);
+  }
+  return chars;
+}
+
+function renderCards() {
+  practiceCardsEl.innerHTML = '';
+  practiceChars.forEach((ch, i) => {
+    const card = document.createElement('div');
+    card.className = 'practice-card';
+    if (i < practiceIdx) card.classList.add('done');
+    if (i === practiceIdx && practiceActive) card.classList.add('current');
+    const code = MORSE[ch];
+    card.innerHTML = `<div class="pc-char">${ch}</div><div class="pc-code">${code.replace(/\./g, '●').replace(/-/g, '▬')}</div><div class="pc-input" id="pc-input-${i}"></div>`;
+    practiceCardsEl.appendChild(card);
+  });
+}
+
+function paddleSignal(signal) {
+  if (!practiceActive || practiceIdx >= practiceChars.length) return;
+  const unit = 80;
+  const dur = signal === '.' ? unit : unit * 3;
+  practiceLight.classList.add('on');
+  playTone(700, dur).then(() => practiceLight.classList.remove('on'));
+
+  practiceInput += signal;
+  const el = document.getElementById(`pc-input-${practiceIdx}`);
+  if (el) el.textContent = practiceInput.replace(/\./g, '●').replace(/-/g, '▬');
+
+  const target = MORSE[practiceChars[practiceIdx]];
+  if (practiceInput === target) {
+    scoreCorrect++; scoreStreak++;
+    document.getElementById('scoreCorrect').textContent = scoreCorrect;
+    document.getElementById('scoreStreak').textContent = scoreStreak;
+    practiceCardsEl.children[practiceIdx].classList.remove('current');
+    practiceCardsEl.children[practiceIdx].classList.add('done');
+    practiceIdx++;
+    practiceInput = '';
+    if (practiceIdx >= practiceChars.length) {
+      practiceFeedback.textContent = '✓ Mind helyes! Jön a következő...';
+      practiceFeedback.className = 'feedback correct';
+      setTimeout(startSendRound, 1000);
+    } else {
+      practiceCardsEl.children[practiceIdx].classList.add('current');
+    }
+  } else if (!target.startsWith(practiceInput)) {
+    scoreWrong++; scoreStreak = 0;
+    document.getElementById('scoreWrong').textContent = scoreWrong;
+    document.getElementById('scoreStreak').textContent = scoreStreak;
+    practiceCardsEl.children[practiceIdx].classList.add('wrong-card');
+    practiceFeedback.textContent = `✗ Hibás! ${practiceChars[practiceIdx]} = ${target.replace(/\./g, '●').replace(/-/g, '▬')}`;
+    practiceFeedback.className = 'feedback wrong';
+    setTimeout(() => {
+      practiceInput = '';
+      const card = practiceCardsEl.children[practiceIdx];
+      if (card) { card.classList.remove('wrong-card'); const inp = document.getElementById(`pc-input-${practiceIdx}`); if (inp) inp.textContent = ''; }
+      practiceFeedback.textContent = ''; practiceFeedback.className = 'feedback';
+    }, 1200);
+  }
+}
+
+function startSendRound() {
+  practiceChars = pickThree();
+  practiceIdx = 0; practiceInput = ''; practiceActive = true;
+  practiceFeedback.textContent = ''; practiceFeedback.className = 'feedback';
+  renderCards();
+  practiceCardsEl.children[0].classList.add('current');
+  practiceStartBtn.textContent = '↻ Újra';
+}
+
+practiceStartBtn.addEventListener('click', startSendRound);
+practiceSkip.addEventListener('click', () => { if (practiceActive) startSendRound(); });
+
+paddleDit.addEventListener('mousedown', e => { e.preventDefault(); paddleSignal('.'); });
+paddleDah.addEventListener('mousedown', e => { e.preventDefault(); paddleSignal('-'); });
+paddleDit.addEventListener('touchstart', e => { e.preventDefault(); paddleSignal('.'); }, { passive: false });
+paddleDah.addEventListener('touchstart', e => { e.preventDefault(); paddleSignal('-'); }, { passive: false });
+
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('send').classList.contains('active')) return;
+  if (e.code === 'ArrowLeft') {
+    e.preventDefault(); paddleDit.classList.add('pressing'); paddleSignal('.');
+    setTimeout(() => paddleDit.classList.remove('pressing'), 150);
+  } else if (e.code === 'ArrowRight') {
+    e.preventDefault(); paddleDah.classList.add('pressing'); paddleSignal('-');
+    setTimeout(() => paddleDah.classList.remove('pressing'), 150);
+  }
+});
+
+// ========== MORZOLÓ MÓD ==========
+const keyerArea = document.getElementById('keyerArea');
+const keyerLight = document.getElementById('keyerLight');
+const keyerSignals = document.getElementById('keyerSignals');
+const keyerDecoded = document.getElementById('keyerDecoded');
+
+let keyerDown = 0, keyerCurrentSignals = '', keyerText = '', keyerCharTimeout = null, keyerWordTimeout = null;
+const KEYER_DOT_THRESHOLD = 200;
+
+function keyerPress() {
+  keyerDown = Date.now();
+  keyerLight.classList.add('on');
+  keyerArea.classList.add('pressing');
+  clearTimeout(keyerCharTimeout);
+  clearTimeout(keyerWordTimeout);
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = 700; gain.gain.value = 0.3;
+  osc.connect(gain); gain.connect(ctx.destination); osc.start();
+  keyerArea._osc = osc;
+}
+
+function keyerRelease() {
+  if (!keyerDown) return;
+  const duration = Date.now() - keyerDown;
+  keyerDown = 0;
+  keyerLight.classList.remove('on');
+  keyerArea.classList.remove('pressing');
+  if (keyerArea._osc) { keyerArea._osc.stop(); keyerArea._osc = null; }
+
+  keyerCurrentSignals += duration < KEYER_DOT_THRESHOLD ? '.' : '-';
+  keyerSignals.textContent = keyerCurrentSignals.replace(/\./g, '●').replace(/-/g, '▬');
+
+  clearTimeout(keyerCharTimeout);
+  keyerCharTimeout = setTimeout(() => {
+    const decoded = REVERSE_MORSE[keyerCurrentSignals];
+    keyerText += decoded || (keyerCurrentSignals ? '?' : '');
+    keyerDecoded.textContent = keyerText;
+    keyerCurrentSignals = ''; keyerSignals.textContent = '';
+    clearTimeout(keyerWordTimeout);
+    keyerWordTimeout = setTimeout(() => {
+      if (keyerText && !keyerText.endsWith(' ')) { keyerText += ' '; keyerDecoded.textContent = keyerText; }
+    }, 1200);
+  }, 500);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.getElementById('keyer').classList.contains('active')) {
+    e.preventDefault(); if (!keyerDown) keyerPress();
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.code === 'Space' && document.getElementById('keyer').classList.contains('active')) {
+    e.preventDefault(); keyerRelease();
+  }
+});
+
+keyerArea.addEventListener('mousedown', e => { e.preventDefault(); keyerPress(); });
+keyerArea.addEventListener('mouseup', e => { e.preventDefault(); keyerRelease(); });
+keyerArea.addEventListener('mouseleave', () => { if (keyerDown) keyerRelease(); });
+keyerArea.addEventListener('touchstart', e => { e.preventDefault(); keyerPress(); }, { passive: false });
+keyerArea.addEventListener('touchend', e => { e.preventDefault(); keyerRelease(); }, { passive: false });
+
+document.getElementById('keyerClear').addEventListener('click', () => {
+  keyerCurrentSignals = ''; keyerText = ''; keyerSignals.textContent = ''; keyerDecoded.textContent = '';
+});
+
+// ========== SZÖVEG → MORSE (in Morzoló tab) ==========
+const learnInput = document.getElementById('learnInput');
+const learnOutput = document.getElementById('learnOutput');
+const learnSpeed = document.getElementById('learnSpeed');
+const learnSpeedVal = document.getElementById('learnSpeedVal');
+const learnPlay = document.getElementById('learnPlay');
+const learnStop = document.getElementById('learnStop');
+const learnLight = document.getElementById('learnLight');
+
+function textToMorse(text) {
+  return text.toUpperCase().split('').map(ch => ch === ' ' ? '  /  ' : (MORSE[ch] || '')).filter(Boolean).join('   ');
+}
+
+function updateLearnOutput() { learnOutput.textContent = textToMorse(learnInput.value); }
+learnInput.addEventListener('input', updateLearnOutput);
+updateLearnOutput();
+
+learnSpeed.addEventListener('input', () => { learnSpeedVal.textContent = learnSpeed.value + ' WPM'; });
+
+learnPlay.addEventListener('click', async () => {
+  const text = learnInput.value.trim();
+  if (!text) return;
+  learnPlay.style.display = 'none'; learnStop.style.display = ''; learnInput.disabled = true;
+  await playMorse(text, parseInt(learnSpeed.value), parseInt(learnSpeed.value), {
+    lightEl: learnLight,
+    onChar(i) {
+      const upper = text.toUpperCase();
+      let html = '';
+      for (let j = 0; j < upper.length; j++) {
+        const ch = upper[j];
+        if (ch === ' ') { html += '  /  '; continue; }
+        const code = MORSE[ch] || '';
+        if (!code) continue;
+        html += j === i ? `<span class="char-highlight">${code}</span>` : code;
+        if (j < upper.length - 1 && upper[j + 1] !== ' ') html += '   ';
+      }
+      learnOutput.innerHTML = html;
+    }
+  });
+  learnPlay.style.display = ''; learnStop.style.display = 'none'; learnInput.disabled = false;
+  updateLearnOutput();
+});
+
+learnStop.addEventListener('click', () => {
+  stopPlayback();
+  learnPlay.style.display = ''; learnStop.style.display = 'none'; learnInput.disabled = false;
+  learnLight.classList.remove('on');
+  updateLearnOutput();
+});
+
+// ========== TÁBLÁZAT ==========
+(function buildTable() {
+  const morseTable = document.getElementById('morseTable');
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const numbers = '0123456789'.split('');
+  const symbols = Object.keys(MORSE).filter(k => !letters.includes(k) && !numbers.includes(k));
+  [...letters, ...numbers, ...symbols].forEach(ch => {
+    const cell = document.createElement('div');
+    cell.className = 'morse-cell';
+    cell.innerHTML = `<div class="char">${ch}</div><div class="code">${MORSE[ch].replace(/\./g, '●').replace(/-/g, '▬')}</div>`;
+    cell.addEventListener('click', () => playMorse(ch, 15));
+    morseTable.appendChild(cell);
+  });
+})();
+</script>
+</body>
+</html>
